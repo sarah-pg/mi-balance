@@ -1,4 +1,4 @@
-const CACHE = 'mi-balance-v3';
+const CACHE = 'mi-balance-v4';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
