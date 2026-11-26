@@ -1360,8 +1360,90 @@
     }
 
     /* ==========================================================================
-       3. LÓGICA DE MOVIMIENTOS FIJOS MENSUALES AUTOMÁTICOS (INGRESOS Y GASTOS)
+3. LÓGICA DE ARRASTRE DE SALDO Y MOVIMIENTOS FIJOS MENSUALES AUTOMÁTICOS
        ========================================================================== */
+    function getPreviousMonth(year, monthIndex) {
+      if (monthIndex === 0) {
+        return { year: year - 1, monthIndex: 11 };
+      }
+      return { year: year, monthIndex: monthIndex - 1 };
+    }
+
+    function syncCarryoverForMonth(year, monthIndex) {
+      const monthKey = getMonthKey(year, monthIndex);
+      const prev = getPreviousMonth(year, monthIndex);
+      const prevMonthKey = getMonthKey(prev.year, prev.monthIndex);
+
+      const prevTxs = appState.transactions.filter(tx => tx.date.startsWith(prevMonthKey));
+      const existingIdx = appState.transactions.findIndex(
+        tx => tx.isCarryover === true && tx.date.startsWith(monthKey)
+      );
+
+      // Si el mes anterior no tiene ningún movimiento, eliminamos cualquier arrastre previo
+      if (prevTxs.length === 0) {
+        if (existingIdx !== -1) {
+          appState.transactions.splice(existingIdx, 1);
+          saveState();
+        }
+        return;
+      }
+
+      let prevIncome = 0;
+      let prevExpense = 0;
+      prevTxs.forEach(tx => {
+        if (tx.type === "income") {
+          prevIncome += Number(tx.amount);
+        } else {
+          prevExpense += Number(tx.amount);
+        }
+      });
+
+      const prevNet = Math.round((prevIncome - prevExpense) * 100) / 100;
+
+      // Si el mes anterior cerró exactamente en 0,00 €, no generamos movimiento
+      if (prevNet === 0) {
+        if (existingIdx !== -1) {
+          appState.transactions.splice(existingIdx, 1);
+          saveState();
+        }
+        return;
+      }
+
+      const carryoverType = prevNet > 0 ? "income" : "expense";
+      const carryoverAmount = Math.abs(prevNet);
+      const carryoverDate = buildDateString(year, monthIndex, 1);
+      const carryoverCategory = carryoverType === "expense" ? "otros_no_ocio" : null;
+
+      if (existingIdx !== -1) {
+        const current = appState.transactions[existingIdx];
+        if (
+          current.type !== carryoverType ||
+          Number(current.amount) !== carryoverAmount ||
+          current.date !== carryoverDate
+        ) {
+          appState.transactions[existingIdx] = {
+            ...current,
+            type: carryoverType,
+            amount: carryoverAmount,
+            date: carryoverDate,
+            categoryId: carryoverCategory
+          };
+          saveState();
+        }
+      } else {
+        appState.transactions.push({
+          id: generateId(),
+          type: carryoverType,
+          amount: carryoverAmount,
+          date: carryoverDate,
+          description: "Saldo arrastrado mes anterior",
+          categoryId: carryoverCategory,
+          isCarryover: true
+        });
+        saveState();
+      }
+    }
+
     function ensureFixedMovementsForMonth(year, monthIndex) {
       const monthKey = getMonthKey(year, monthIndex);
 
@@ -1376,7 +1458,6 @@
       activeTemplates.forEach(tpl => {
         const tplType = tpl.type === "income" ? "income" : "expense";
 
-        // Evitar duplicados si ya existe una transacción de esta plantilla en este mes
         const alreadyExists = appState.transactions.some(tx =>
           tx.fixedTemplateId === tpl.id && tx.date.startsWith(monthKey)
         );
@@ -1408,13 +1489,15 @@
       }
       return insertedCount;
     }
-
+    
     /* ==========================================================================
        4. RENDERIZADO DE LA INTERFAZ (BALANCE, DESGLOSE, MOVIMIENTOS Y FIJOS)
        ========================================================================== */
     function renderAll() {
       // Aseguramos los ingresos y gastos fijos del mes activo antes de pintar
       ensureFixedMovementsForMonth(currentYear, currentMonth);
+      // Sincronizamos el arrastre del saldo neto del mes anterior en el día 1
+      syncCarryoverForMonth(currentYear, currentMonth);
 
       // Actualizar cabecera del mes
       document.getElementById("currentMonthDisplay").textContent =
@@ -2136,41 +2219,12 @@
     }
 
     /* ==========================================================================
-       8. REGISTRO DE SERVICE WORKER OFFLINE INLINE (SI EL NAVEGADOR LO PERMITE)
-       ========================================================================== */
-    function registerInlineServiceWorker() {
-      if ("serviceWorker" in navigator && (location.protocol === "https:" || location.protocol === "http:")) {
-        const swCode = `
-          const CACHE_NAME = 'mi-balance-cache-v1';
-          self.addEventListener('install', (e) => {
-            self.skipWaiting();
-            e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
-          });
-          self.addEventListener('activate', (e) => {
-            e.waitUntil(self.clients.claim());
-          });
-          self.addEventListener('fetch', (e) => {
-            e.respondWith(
-              caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('./')))
-            );
-          });
-        `;
-        try {
-          const blob = new Blob([swCode], { type: "application/javascript" });
-          const swUrl = URL.createObjectURL(blob);
-          navigator.serviceWorker.register(swUrl).catch(() => {});
-        } catch (e) {}
-      }
-    }
-
-    /* ==========================================================================
-       9. EVENTOS E INICIALIZACIÓN DE LA APLICACIÓN
+       8. EVENTOS E INICIALIZACIÓN DE LA APLICACIÓN
        ========================================================================== */
     window.addEventListener("DOMContentLoaded", () => {
       loadState();
       initCategorySelectors();
-      registerInlineServiceWorker();
-
+      
       // Navegación entre meses
       document.getElementById("prevMonthBtn").addEventListener("click", () => {
         currentMonth--;
