@@ -1,0 +1,2291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Mi Balance · Control Diario</title>
+
+  <!-- Manifiesto PWA inline para permitir "Añadir a pantalla de inicio" sin archivos externos -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"Mi Balance Offline","short_name":"Mi Balance","start_url":".","display":"standalone","background_color":"#f8fafc","theme_color":"#0f172a"}' />
+
+  <style>
+    /* ==========================================================================
+       VARIABLES DE TEMA Y DISEÑO MOBILE-FIRST (100% AUTOCONTENIDO SIN CDNs)
+       ========================================================================== */
+    :root {
+      --bg-app: #f1f5f9;
+      --bg-card: #ffffff;
+      --bg-elevated: #f8fafc;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+
+      /* Colores semánticos */
+      --income-color: #059669;
+      --income-bg: #d1fae5;
+      --expense-color: #e11d48;
+      --expense-bg: #ffe4e6;
+      --primary-color: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-soft: #dbeafe;
+
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+      --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.16);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Modo Oscuro */
+    [data-theme="dark"] {
+      --bg-app: #090d16;
+      --bg-card: #131b2e;
+      --bg-elevated: #1b253b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #26334d;
+
+      --income-color: #34d399;
+      --income-bg: rgba(16, 185, 129, 0.16);
+      --expense-color: #fb7185;
+      --expense-bg: rgba(244, 63, 94, 0.16);
+      --primary-color: #3b82f6;
+      --primary-hover: #60a5fa;
+      --primary-soft: rgba(59, 130, 246, 0.18);
+
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-sans);
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      line-height: 1.45;
+      overflow-x: hidden;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Contenedor centrado estilo app móvil */
+    .app-shell {
+      max-width: 540px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 96px; /* Espacio para barra inferior */
+    }
+
+    /* ==========================================================================
+       CABECERA Y SELECTOR DE MES
+       ========================================================================== */
+    .top-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background-color: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .header-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+
+    .offline-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--income-bg);
+      color: var(--income-color);
+    }
+
+    .icon-btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s ease, background-color 0.15s ease;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+
+    .month-navigator {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 4px;
+    }
+
+    .month-nav-btn {
+      width: 44px;
+      height: 40px;
+      border: none;
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .month-nav-btn:active {
+      transform: scale(0.93);
+    }
+
+    .current-month-label {
+      font-weight: 700;
+      font-size: 1.05rem;
+      text-transform: capitalize;
+      user-select: none;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 8px;
+    }
+
+    /* ==========================================================================
+       CONTENIDO PRINCIPAL Y TARJETAS
+       ========================================================================== */
+    .main-content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .view-section {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .view-section.active {
+      display: flex;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Tarjeta Hero de Balance */
+    .balance-hero {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #ffffff;
+      border: none;
+      box-shadow: var(--shadow-md);
+    }
+
+    [data-theme="dark"] .balance-hero {
+      background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+      border: 1px solid #2563eb44;
+    }
+
+    .balance-title {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .balance-amount {
+      font-size: 2.15rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 4px 0 14px 0;
+    }
+
+    .balance-amount.positive { color: #34d399; }
+    .balance-amount.negative { color: #fb7185; }
+    .balance-amount.neutral  { color: #ffffff; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .summary-pill {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .summary-pill-label {
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .summary-pill-value {
+      font-size: 1.12rem;
+      font-weight: 700;
+    }
+
+    .summary-pill-value.inc { color: #34d399; }
+    .summary-pill-value.exp { color: #fb7185; }
+
+    /* ==========================================================================
+       DESGLOSE POR CATEGORÍAS (GRÁFICO DE BARRAS PURO)
+       ========================================================================== */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .toggle-link {
+      background: none;
+      border: none;
+      color: var(--primary-color);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    .category-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .cat-bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cat-bar-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.86rem;
+    }
+
+    .cat-bar-name {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 600;
+    }
+
+    .cat-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .cat-bar-amount {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cat-bar-pct {
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.78rem;
+      margin-left: 4px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: var(--bg-elevated);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+
+    /* ==========================================================================
+       FILTROS Y LISTADO CRONOLÓGICO DÍA A DÍA
+       ========================================================================== */
+    .filters-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+
+    .filter-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 0.83rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip.active {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: #ffffff;
+    }
+
+    .category-filter-select {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+
+    .day-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: capitalize;
+    }
+
+    .tx-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tx-left {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .tx-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .tx-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .tx-title {
+      font-weight: 700;
+      font-size: 0.94rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-main);
+    }
+
+    .tx-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 3px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+    .badge-fixed {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: var(--primary-soft);
+      color: var(--primary-color);
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+
+    .badge-fixed.income {
+      background: var(--income-bg);
+      color: var(--income-color);
+    }
+
+    .tx-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .tx-amount {
+      font-weight: 800;
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tx-amount.income { color: var(--income-color); }
+    .tx-amount.expense { color: var(--expense-color); }
+
+    .tx-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .mini-btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      border-radius: 7px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .mini-btn:active {
+      transform: scale(0.95);
+    }
+
+    .mini-btn.danger {
+      color: var(--expense-color);
+    }
+
+    /* ==========================================================================
+       SECCIÓN GASTOS FIJOS MENSUALES
+       ========================================================================== */
+    .fixed-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .fixed-card.inactive {
+      opacity: 0.6;
+    }
+
+    .fixed-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .fixed-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* Switch táctil */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: var(--border-color);
+      transition: 0.2s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary-color);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* ==========================================================================
+       BARRA INFERIOR DE NAVEGACIÓN + BOTÓN FLOTANTE (+)
+       ========================================================================== */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      height: 70px;
+      max-width: 540px;
+      margin: 0 auto;
+      padding: 0 8px;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      height: 100%;
+    }
+
+    .nav-item.active {
+      color: var(--primary-color);
+    }
+
+    .fab-wrapper {
+      position: relative;
+      top: -16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .fab-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--primary-color);
+      color: #ffffff;
+      border: 4px solid var(--bg-app);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-lg);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .fab-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* ==========================================================================
+       MODAL INFERIOR (BOTTOM SHEET) PARA AÑADIR / EDITAR MOVIMIENTOS
+       ========================================================================== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(2px);
+      z-index: 50;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-sheet {
+      background: var(--bg-card);
+      width: 100%;
+      max-width: 540px;
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      padding: 20px 18px 28px 18px;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      animation: slideUp 0.22s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .type-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: var(--bg-elevated);
+      padding: 5px;
+      border-radius: var(--radius-md);
+      margin-bottom: 16px;
+    }
+
+    .type-btn {
+      padding: 12px;
+      border: none;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+
+    .type-btn.active-expense {
+      background: var(--expense-color);
+      color: #ffffff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .type-btn.active-income {
+      background: var(--income-color);
+      color: #ffffff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.83rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    .form-control:focus {
+      outline: 2px solid var(--primary-color);
+      border-color: transparent;
+    }
+
+    .amount-input {
+      font-size: 1.65rem;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    /* Rejilla táctil de categorías */
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .cat-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 11px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border-color);
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.12s ease;
+    }
+
+    .cat-option.selected {
+      border-color: var(--primary-color);
+      background: var(--primary-soft);
+      color: var(--primary-color);
+    }
+
+    /* Checkbox grande para Gasto Fijo Mensual */
+    .fixed-checkbox-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border-color);
+      background: var(--bg-elevated);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .fixed-checkbox-box input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--primary-color);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: var(--radius-md);
+      background: var(--primary-color);
+      color: #ffffff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    /* Toast de notificación (sin usar alert()) */
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: #0f172a;
+      color: #ffffff;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      box-shadow: var(--shadow-lg);
+      z-index: 100;
+      transition: transform 0.25s ease;
+      white-space: nowrap;
+      max-width: 92vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Diálogo de confirmación personalizado (sin window.confirm) */
+    .confirm-dialog {
+      background: var(--bg-card);
+      width: 90%;
+      max-width: 380px;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-lg);
+      margin: auto;
+    }
+
+    .confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div class="app-shell">
+    <!-- CABECERA SUPERIOR CON NAVEGACIÓN DE MES -->
+    <header class="top-header">
+      <div class="header-top-row">
+        <div class="app-brand">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-color);">
+            <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+            <line x1="2" y1="10" x2="22" y2="10"></line>
+          </svg>
+          <span>Mi Balance</span>
+          <span class="offline-pill" title="Todos tus datos se guardan localmente en tu móvil">
+            ● 100% Offline
+          </span>
+        </div>
+
+        <button id="themeToggleBtn" class="icon-btn" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+          <svg id="themeIcon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="month-navigator">
+        <button id="prevMonthBtn" class="month-nav-btn" aria-label="Mes anterior">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div id="currentMonthDisplay" class="current-month-label" title="Pulsa para volver al mes actual">
+          Noviembre 2026
+        </div>
+        <button id="nextMonthBtn" class="month-nav-btn" aria-label="Mes siguiente">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- ====================================================================
+           VISTA 1: RESUMEN Y MOVIMIENTOS DIARIOS DEL MES
+           ==================================================================== -->
+      <section id="view-dashboard" class="view-section active">
+        <!-- Tarjeta Principal de Balance -->
+        <div class="card balance-hero">
+          <div class="balance-title">Balance Neto del Mes</div>
+          <div id="netBalanceValue" class="balance-amount neutral">0,00 €</div>
+          <div class="summary-grid">
+            <div class="summary-pill">
+              <span class="summary-pill-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                Ingresos
+              </span>
+              <span id="totalIncomeValue" class="summary-pill-value inc">0,00 €</span>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-pill-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+                Gastos
+              </span>
+              <span id="totalExpenseValue" class="summary-pill-value exp">0,00 €</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desglose por Categoría -->
+        <div class="card">
+          <div class="section-header">
+            <h2 class="section-title">Gastos por Categoría</h2>
+            <button id="toggleBreakdownBtn" class="toggle-link">Ocultar</button>
+          </div>
+          <div id="categoryBreakdownContainer" class="category-bars"></div>
+        </div>
+
+        <!-- Filtros y Listado Día a Día -->
+        <div>
+          <div class="section-header" style="margin-bottom: 8px;">
+            <h2 class="section-title">Movimientos del Mes</h2>
+            <span id="txCountBadge" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">0 mov.</span>
+          </div>
+
+          <div class="filters-bar" style="margin-bottom: 12px;">
+            <div class="filter-chips" id="typeFilterChips">
+              <button class="chip active" data-filter="all">Todos</button>
+              <button class="chip" data-filter="expense">Gastos</button>
+              <button class="chip" data-filter="income">Ingresos</button>
+              <button class="chip" data-filter="fixed">Fijos</button>
+            </div>
+            <select id="categoryFilterSelect" class="category-filter-select" aria-label="Filtrar por categoría">
+              <option value="all">Todas las categorías</option>
+            </select>
+          </div>
+
+          <div id="transactionsListContainer"></div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 2: PLANTILLAS DE INGRESOS Y GASTOS FIJOS MENSUALES
+           ==================================================================== -->
+      <section id="view-fixed" class="view-section">
+        <div class="card">
+          <div class="section-header" style="margin-bottom: 6px;">
+            <h2 class="section-title">Movimientos Fijos Mensuales</h2>
+            <button id="addFixedDirectBtn" class="toggle-link">+ Nuevo Fijo</button>
+          </div>
+          <p style="font-size: 0.84rem; color: var(--text-muted);">
+            Los ingresos y gastos fijos activos se añaden automáticamente cada vez que avanzas o entras a un mes nuevo. Si pausas o eliminas uno, dejará de aplicarse en meses futuros sin borrar tu historial anterior.
+          </p>
+          <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.84rem; font-weight: 600; color: var(--text-muted);">Total ingresos fijos activos / mes:</span>
+              <span id="totalFixedIncomeMonthlyValue" style="font-size: 1rem; font-weight: 800; color: var(--income-color);">0,00 €</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.84rem; font-weight: 600; color: var(--text-muted);">Total gastos fijos activos / mes:</span>
+              <span id="totalFixedMonthlyValue" style="font-size: 1rem; font-weight: 800; color: var(--expense-color);">0,00 €</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="fixedTemplatesListContainer" style="display: flex; flex-direction: column; gap: 14px;"></div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 3: COPIA DE SEGURIDAD Y DATOS LOCALES
+           ==================================================================== -->
+      <section id="view-settings" class="view-section">
+        <div class="card">
+          <h2 class="section-title" style="margin-bottom: 6px;">Copia de Seguridad (JSON)</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+            Tus ingresos, gastos y plantillas fijas se guardan exclusivamente en la memoria interna de este navegador. Exporta una copia periódicamente para conservarla o pasarla a otro móvil.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button id="exportJsonBtn" class="btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Exportar Copia de Seguridad (.json)
+            </button>
+
+            <button id="importJsonTriggerBtn" class="btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Restaurar Copia de Seguridad (.json)
+            </button>
+            <input type="file" id="importJsonFileInput" accept=".json,application/json" style="display: none;" />
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title" style="margin-bottom: 6px;">Información del Almacenamiento</h2>
+          <p id="storageStatsText" style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 14px;"></p>
+          <button id="resetAllDataBtn" class="btn-secondary" style="color: var(--expense-color); border-color: var(--expense-bg);">
+            Borrar todos los datos del dispositivo
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- ======================================================================
+         BARRA DE NAVEGACIÓN INFERIOR TÁCTIL
+         ====================================================================== -->
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button class="nav-item active" data-target="view-dashboard">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        <span>Balance</span>
+      </button>
+
+      <div class="fab-wrapper">
+        <button id="openAddModalBtn" class="fab-btn" aria-label="Añadir ingreso o gasto" title="Añadir movimiento">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+
+      <button class="nav-item" data-target="view-fixed">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="17 1 21 5 17 9"></polyline>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+          <polyline points="7 23 3 19 7 15"></polyline>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+        </svg>
+        <span>Fijos</span>
+      </button>
+
+      <button class="nav-item" data-target="view-settings">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        <span>Datos</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ========================================================================
+       MODAL BOTTOM-SHEET: AÑADIR / EDITAR MOVIMIENTO O GASTO FIJO
+       ======================================================================== -->
+  <div id="movementModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h3 id="modalTitle" class="modal-title">Nuevo Movimiento</h3>
+        <button id="closeModalBtn" class="icon-btn" aria-label="Cerrar ventana">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <form id="movementForm" novalidate>
+        <input type="hidden" id="editIdInput" value="" />
+        <input type="hidden" id="editModeInput" value="transaction" />
+
+        <!-- Selector Tipo: Gasto / Ingreso -->
+        <div id="typeSelectorContainer" class="type-selector">
+          <button type="button" id="btnTypeExpense" class="type-btn active-expense">Gasto (-)</button>
+          <button type="button" id="btnTypeIncome" class="type-btn">Ingreso (+)</button>
+        </div>
+
+        <!-- Importe -->
+        <div class="form-group">
+          <label for="amountInput" class="form-label">Importe (€)</label>
+          <input type="number" id="amountInput" class="form-control amount-input" inputmode="decimal" step="0.01" min="0.01" placeholder="0,00" required />
+        </div>
+
+        <!-- Fecha o Día del Mes (según si es movimiento o plantilla fija) -->
+        <div class="form-group" id="dateFieldGroup">
+          <label for="dateInput" class="form-label">Fecha</label>
+          <input type="date" id="dateInput" class="form-control" required />
+        </div>
+
+        <div class="form-group" id="dayOfMonthFieldGroup" style="display: none;">
+          <label for="dayOfMonthInput" class="form-label">Día del mes en que se aplica (1 - 31)</label>
+          <input type="number" id="dayOfMonthInput" class="form-control" inputmode="numeric" min="1" max="31" value="1" />
+        </div>
+
+        <!-- Concepto / Descripción -->
+        <div class="form-group">
+          <label for="descInput" class="form-label">Concepto / Descripción</label>
+          <input type="text" id="descInput" class="form-control" maxlength="80" placeholder="Ej. Compra supermercado, Nómina, Luz..." />
+        </div>
+
+        <!-- Categorías (solo visible cuando es Gasto) -->
+        <div class="form-group" id="categorySectionGroup">
+          <label class="form-label">Categoría del Gasto</label>
+          <div id="categorySelectorGrid" class="category-grid"></div>
+        </div>
+
+        <!-- Checkbox Movimiento Fijo Mensual (Gasto fijo o Ingreso fijo según tipo) -->
+        <div class="form-group" id="fixedCheckboxGroup">
+          <label class="fixed-checkbox-box" for="isFixedCheckbox">
+            <input type="checkbox" id="isFixedCheckbox" />
+            <div>
+              <div id="fixedCheckboxTitle" style="font-weight: 700; font-size: 0.92rem;">Gasto fijo mensual</div>
+              <div id="fixedCheckboxSub" style="font-size: 0.78rem; color: var(--text-muted);">Se repetirá automáticamente cada mes en este día</div>
+            </div>
+          </label>
+        </div>
+
+        <button type="submit" id="saveMovementBtn" class="btn-primary">Guardar Movimiento</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       DIÁLOGO DE CONFIRMACIÓN PERSONALIZADO (SIN window.confirm)
+       ======================================================================== -->
+  <div id="confirmModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="confirm-dialog">
+      <h3 id="confirmTitle" style="font-size: 1.05rem; font-weight: 800; margin-bottom: 8px;">Confirmar acción</h3>
+      <p id="confirmMessage" style="font-size: 0.88rem; color: var(--text-muted);"></p>
+      <div class="confirm-actions">
+        <button id="confirmCancelBtn" class="btn-secondary">Cancelar</button>
+        <button id="confirmOkBtn" class="btn-primary" style="margin-top: 0; background: var(--expense-color);">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. DEFINICIÓN DE CATEGORÍAS OBLIGATORIAS Y CONFIGURACIÓN INICIAL
+       ========================================================================== */
+    const CATEGORIES = [
+      { id: "alquiler",          name: "Alquiler",          icon: "🏠", color: "#6366f1" },
+      { id: "suministros",       name: "Suministros",       icon: "💡", color: "#f59e0b" },
+      { id: "telefono_internet", name: "Teléfono/Internet", icon: "📱", color: "#0ea5e9" },
+      { id: "plataformas",       name: "Plataformas",       icon: "🎬", color: "#8b5cf6" },
+      { id: "gasolina",          name: "Gasolina",          icon: "⛽", color: "#ef4444" },
+      { id: "comida",            name: "Comida",            icon: "🛒", color: "#10b981" },
+      { id: "peaje",             name: "Peaje",             icon: "🛣️", color: "#64748b" },
+      { id: "comidas_fuera",     name: "Comidas fuera",     icon: "🍽️", color: "#f97316" },
+      { id: "otros_ocio",        name: "Otros ocio",        icon: "🎟️", color: "#ec4899" },
+      { id: "otros_no_ocio",     name: "Otros no ocio",     icon: "📦", color: "#14b8a6" }
+    ];
+
+    const MONTH_NAMES = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    const STORAGE_KEY = "mi_balance_offline_v1";
+
+    /* Estado global de la aplicación */
+    let appState = {
+      transactions: [],    // { id, type: 'income'|'expense', amount, date: 'YYYY-MM-DD', description, categoryId, fixedTemplateId? }
+      fixedTemplates: [],  // { id, type: 'income'|'expense', amount, dayOfMonth, description, categoryId, active: true }
+      generatedMonths: [], // ['2026-11', ...] -> meses donde ya se aplicaron las plantillas activas
+      theme: "light"
+    };
+
+    const today = new Date();
+    let currentYear = today.getFullYear();
+    let currentMonth = today.getMonth(); // 0 - 11
+
+    let activeTypeFilter = "all";
+    let activeCategoryFilter = "all";
+    let showBreakdown = true;
+
+    /* Variables temporales del formulario */
+    let formType = "expense";
+    let formCategoryId = CATEGORIES[0].id;
+
+    /* ==========================================================================
+       2. PERSISTENCIA EN LOCALSTORAGE Y UTILIDADES DE FECHA / MONEDA
+       ========================================================================== */
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          appState.transactions = Array.isArray(parsed.transactions) ? parsed.transactions : [];
+          // Compatibilidad hacia atrás: plantillas antiguas sin propiedad 'type' son 'expense'
+          appState.fixedTemplates = Array.isArray(parsed.fixedTemplates)
+            ? parsed.fixedTemplates.map(tpl => ({
+                ...tpl,
+                type: tpl.type === "income" ? "income" : "expense"
+              }))
+            : [];
+          appState.generatedMonths = Array.isArray(parsed.generatedMonths) ? parsed.generatedMonths : [];
+          appState.theme = parsed.theme === "dark" ? "dark" : "light";
+        }
+      } catch (e) {
+        console.error("Error leyendo localStorage:", e);
+      }
+      applyTheme(appState.theme);
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {
+        showToast("Error: Memoria llena o bloqueada en el navegador");
+      }
+    }
+
+    function getMonthKey(year, monthIndex) {
+      return `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    }
+
+    function getDaysInMonth(year, monthIndex) {
+      return new Date(year, monthIndex + 1, 0).getDate();
+    }
+
+    function buildDateString(year, monthIndex, day) {
+      const maxDay = getDaysInMonth(year, monthIndex);
+      const safeDay = Math.min(Math.max(1, day), maxDay);
+      return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+    }
+
+    function getTodayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function formatCurrency(num) {
+      return new Intl.NumberFormat("es-ES", {
+        style: "currency",
+        currency: "EUR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(num || 0);
+    }
+
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+    }
+
+    function getCategoryById(id) {
+      return CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, 2800);
+    }
+
+    /* ==========================================================================
+       3. LÓGICA DE MOVIMIENTOS FIJOS MENSUALES AUTOMÁTICOS (INGRESOS Y GASTOS)
+       ========================================================================== */
+    function ensureFixedMovementsForMonth(year, monthIndex) {
+      const monthKey = getMonthKey(year, monthIndex);
+
+      // Si ya se procesó este mes anteriormente, no duplicamos
+      if (appState.generatedMonths.includes(monthKey)) {
+        return 0;
+      }
+
+      const activeTemplates = appState.fixedTemplates.filter(tpl => tpl.active);
+      let insertedCount = 0;
+
+      activeTemplates.forEach(tpl => {
+        const tplType = tpl.type === "income" ? "income" : "expense";
+
+        // Evitar duplicados si ya existe una transacción de esta plantilla en este mes
+        const alreadyExists = appState.transactions.some(tx =>
+          tx.fixedTemplateId === tpl.id && tx.date.startsWith(monthKey)
+        );
+
+        if (!alreadyExists) {
+          const txDate = buildDateString(year, monthIndex, tpl.dayOfMonth);
+          const defaultDesc = tplType === "income"
+            ? "Ingreso fijo"
+            : getCategoryById(tpl.categoryId).name;
+
+          appState.transactions.push({
+            id: generateId(),
+            type: tplType,
+            amount: Number(tpl.amount),
+            date: txDate,
+            description: tpl.description || defaultDesc,
+            categoryId: tplType === "expense" ? tpl.categoryId : null,
+            fixedTemplateId: tpl.id
+          });
+          insertedCount++;
+        }
+      });
+
+      appState.generatedMonths.push(monthKey);
+      saveState();
+
+      if (insertedCount > 0) {
+        showToast(`Se añadieron ${insertedCount} movimiento(s) fijo(s) a ${MONTH_NAMES[monthIndex]}`);
+      }
+      return insertedCount;
+    }
+
+    /* ==========================================================================
+       4. RENDERIZADO DE LA INTERFAZ (BALANCE, DESGLOSE, MOVIMIENTOS Y FIJOS)
+       ========================================================================== */
+    function renderAll() {
+      // Aseguramos los ingresos y gastos fijos del mes activo antes de pintar
+      ensureFixedMovementsForMonth(currentYear, currentMonth);
+
+      // Actualizar cabecera del mes
+      document.getElementById("currentMonthDisplay").textContent =
+        `${MONTH_NAMES[currentMonth]} ${currentYear}`;
+
+      renderDashboard();
+      renderFixedTemplates();
+      renderStorageStats();
+    }
+
+    function renderDashboard() {
+      const monthKey = getMonthKey(currentYear, currentMonth);
+      const monthTxs = appState.transactions.filter(tx => tx.date.startsWith(monthKey));
+
+      // 1. Cálculo de Ingresos, Gastos y Balance
+      let totalIncome = 0;
+      let totalExpense = 0;
+      const categoryTotals = {};
+      CATEGORIES.forEach(c => { categoryTotals[c.id] = 0; });
+
+      monthTxs.forEach(tx => {
+        if (tx.type === "income") {
+          totalIncome += Number(tx.amount);
+        } else {
+          totalExpense += Number(tx.amount);
+          const catKey = categoryTotals.hasOwnProperty(tx.categoryId) ? tx.categoryId : "otros_no_ocio";
+          categoryTotals[catKey] += Number(tx.amount);
+        }
+      });
+
+      const netBalance = totalIncome - totalExpense;
+      const balanceEl = document.getElementById("netBalanceValue");
+      balanceEl.textContent = formatCurrency(netBalance);
+      balanceEl.className = "balance-amount " + (netBalance > 0 ? "positive" : netBalance < 0 ? "negative" : "neutral");
+
+      document.getElementById("totalIncomeValue").textContent = formatCurrency(totalIncome);
+      document.getElementById("totalExpenseValue").textContent = formatCurrency(totalExpense);
+
+      // 2. Desglose visual por categoría
+      const breakdownEl = document.getElementById("categoryBreakdownContainer");
+      breakdownEl.style.display = showBreakdown ? "flex" : "none";
+
+      if (totalExpense <= 0) {
+        breakdownEl.innerHTML = `<div class="empty-state" style="padding: 12px 0;">Aún no hay gastos registrados en ${MONTH_NAMES[currentMonth]}.</div>`;
+      } else {
+        // Ordenar categorías con gasto de mayor a menor
+        const sortedCats = CATEGORIES
+          .map(cat => ({ ...cat, total: categoryTotals[cat.id] || 0 }))
+          .filter(cat => cat.total > 0)
+          .sort((a, b) => b.total - a.total);
+
+        breakdownEl.innerHTML = sortedCats.map(cat => {
+          const pct = Math.round((cat.total / totalExpense) * 100);
+          return `
+            <div class="cat-bar-item">
+              <div class="cat-bar-top">
+                <span class="cat-bar-name">
+                  <span class="cat-dot" style="background: ${cat.color};"></span>
+                  <span>${cat.icon} ${cat.name}</span>
+                </span>
+                <span class="cat-bar-amount">
+                  ${formatCurrency(cat.total)}<span class="cat-bar-pct">(${pct}%)</span>
+                </span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: ${pct}%; background: ${cat.color};"></div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      // 3. Filtrado y Listado Cronológico Día a Día
+      let filteredTxs = monthTxs.filter(tx => {
+        if (activeTypeFilter === "income" && tx.type !== "income") return false;
+        if (activeTypeFilter === "expense" && tx.type !== "expense") return false;
+        if (activeTypeFilter === "fixed" && !tx.fixedTemplateId) return false;
+        if (activeCategoryFilter !== "all") {
+          if (tx.type !== "expense" || tx.categoryId !== activeCategoryFilter) return false;
+        }
+        return true;
+      });
+
+      // Ordenar cronológicamente (días más recientes arriba, y dentro del día por orden de creación)
+      filteredTxs.sort((a, b) => b.date.localeCompare(a.date));
+
+      document.getElementById("txCountBadge").textContent =
+        `${filteredTxs.length} ${filteredTxs.length === 1 ? "mov." : "movs."}`;
+
+      const listContainer = document.getElementById("transactionsListContainer");
+      if (filteredTxs.length === 0) {
+        listContainer.innerHTML = `
+          <div class="card empty-state">
+            <div style="font-size: 1.8rem; margin-bottom: 6px;">📭</div>
+            <div>No hay movimientos que mostrar en este filtro.</div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">Pulsa el botón <strong>+</strong> inferior para añadir uno.</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Agrupar por fecha YYYY-MM-DD
+      const groups = {};
+      filteredTxs.forEach(tx => {
+        if (!groups[tx.date]) groups[tx.date] = [];
+        groups[tx.date].push(tx);
+      });
+
+      const dateFormatter = new Intl.DateTimeFormat("es-ES", {
+        weekday: "long",
+        day: "numeric",
+        month: "short"
+      });
+
+      listContainer.innerHTML = Object.keys(groups).map(dateStr => {
+        const [y, m, d] = dateStr.split("-").map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const prettyDate = dateFormatter.format(dateObj);
+
+        const dayNet = groups[dateStr].reduce((acc, item) =>
+          acc + (item.type === "income" ? Number(item.amount) : -Number(item.amount)), 0);
+
+        const itemsHtml = groups[dateStr].map(tx => {
+          const isIncome = tx.type === "income";
+          const cat = isIncome ? { icon: "💶", name: "Ingreso", color: "#059669" } : getCategoryById(tx.categoryId);
+          const title = escapeHtml(tx.description || cat.name);
+          const sign = isIncome ? "+" : "-";
+
+          return `
+            <div class="tx-item">
+              <div class="tx-left">
+                <div class="tx-icon" style="background: ${isIncome ? "var(--income-bg)" : cat.color + "20"}; color: ${isIncome ? "var(--income-color)" : cat.color};">
+                  ${cat.icon}
+                </div>
+                <div class="tx-info">
+                  <div class="tx-title">${title}</div>
+                  <div class="tx-meta">
+                    <span>${cat.name}</span>
+                    ${tx.fixedTemplateId ? `<span class="badge-fixed ${isIncome ? "income" : ""}">↻ ${isIncome ? "Ingreso fijo" : "Gasto fijo"}</span>` : ""}
+                  </div>
+                </div>
+              </div>
+              <div class="tx-right">
+                <div class="tx-amount ${isIncome ? "income" : "expense"}">
+                  ${sign}${formatCurrency(tx.amount)}
+                </div>
+                <div class="tx-actions">
+                  <button class="mini-btn" onclick="openEditTransaction('${tx.id}')">Editar</button>
+                  <button class="mini-btn danger" onclick="requestDeleteTransaction('${tx.id}')">Borrar</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <div class="day-group">
+            <div class="day-header">
+              <span>${prettyDate}</span>
+              <span>${dayNet >= 0 ? "+" : ""}${formatCurrency(dayNet)}</span>
+            </div>
+            ${itemsHtml}
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderFixedTemplates() {
+      const container = document.getElementById("fixedTemplatesListContainer");
+
+      const incomeTemplates = appState.fixedTemplates
+        .filter(t => t.type === "income")
+        .sort((a, b) => a.dayOfMonth - b.dayOfMonth);
+
+      const expenseTemplates = appState.fixedTemplates
+        .filter(t => t.type !== "income")
+        .sort((a, b) => a.dayOfMonth - b.dayOfMonth);
+
+      const totalActiveIncome = incomeTemplates
+        .filter(t => t.active)
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      const totalActiveExpense = expenseTemplates
+        .filter(t => t.active)
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      document.getElementById("totalFixedIncomeMonthlyValue").textContent = formatCurrency(totalActiveIncome);
+      document.getElementById("totalFixedMonthlyValue").textContent = formatCurrency(totalActiveExpense);
+
+      if (appState.fixedTemplates.length === 0) {
+        container.innerHTML = `
+          <div class="card empty-state">
+            <div style="font-size: 1.8rem; margin-bottom: 6px;">🔁</div>
+            <div>No tienes ingresos ni gastos fijos mensuales configurados.</div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">Marca la casilla <strong>"Ingreso fijo mensual"</strong> o <strong>"Gasto fijo mensual"</strong> al registrar un movimiento, o pulsa "+ Nuevo Fijo".</div>
+          </div>
+        `;
+        return;
+      }
+
+      const renderTemplateCard = (tpl) => {
+        const isIncome = tpl.type === "income";
+        const cat = isIncome
+          ? { icon: "💶", name: "Ingreso fijo", color: "#059669" }
+          : getCategoryById(tpl.categoryId);
+
+        return `
+          <div class="fixed-card ${tpl.active ? "" : "inactive"}">
+            <div class="fixed-top">
+              <div class="tx-left">
+                <div class="tx-icon" style="background: ${isIncome ? "var(--income-bg)" : cat.color + "20"}; color: ${isIncome ? "var(--income-color)" : cat.color};">
+                  ${cat.icon}
+                </div>
+                <div class="tx-info">
+                  <div class="tx-title">${escapeHtml(tpl.description || cat.name)}</div>
+                  <div class="tx-meta">
+                    <span>${cat.name}</span>
+                    <span>•</span>
+                    <strong>Día ${tpl.dayOfMonth} de cada mes</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="tx-amount ${isIncome ? "income" : "expense"}">
+                ${isIncome ? "+" : "-"}${formatCurrency(tpl.amount)}
+              </div>
+            </div>
+
+            <div class="fixed-bottom">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                <span class="switch">
+                  <input type="checkbox" ${tpl.active ? "checked" : ""} onchange="toggleFixedTemplate('${tpl.id}')" />
+                  <span class="slider"></span>
+                </span>
+                <span>${tpl.active ? "Activo (se repite)" : "Pausado"}</span>
+              </label>
+
+              <div class="tx-actions">
+                <button class="mini-btn" onclick="openEditFixedTemplate('${tpl.id}')">Editar</button>
+                <button class="mini-btn danger" onclick="requestDeleteFixedTemplate('${tpl.id}')">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      let html = "";
+
+      if (incomeTemplates.length > 0) {
+        html += `
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="day-header">
+              <span style="color: var(--income-color);">Ingresos Fijos Mensuales (${incomeTemplates.length})</span>
+              <span style="color: var(--income-color);">+${formatCurrency(totalActiveIncome)}/mes</span>
+            </div>
+            ${incomeTemplates.map(renderTemplateCard).join("")}
+          </div>
+        `;
+      }
+
+      if (expenseTemplates.length > 0) {
+        html += `
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="day-header">
+              <span style="color: var(--expense-color);">Gastos Fijos Mensuales (${expenseTemplates.length})</span>
+              <span style="color: var(--expense-color);">-${formatCurrency(totalActiveExpense)}/mes</span>
+            </div>
+            ${expenseTemplates.map(renderTemplateCard).join("")}
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function renderStorageStats() {
+      const statsEl = document.getElementById("storageStatsText");
+      statsEl.textContent = `Movimientos guardados: ${appState.transactions.length} · Plantillas fijas (ingresos y gastos): ${appState.fixedTemplates.length}.`;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    /* ==========================================================================
+       5. FORMULARIO MODAL (CREAR / EDITAR MOVIMIENTOS Y GASTOS FIJOS)
+       ========================================================================== */
+    function initCategorySelectors() {
+      // Filtro en el dashboard
+      const filterSelect = document.getElementById("categoryFilterSelect");
+      CATEGORIES.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat.id;
+        opt.textContent = `${cat.icon} ${cat.name}`;
+        filterSelect.appendChild(opt);
+      });
+
+      // Rejilla táctil dentro del modal
+      const grid = document.getElementById("categorySelectorGrid");
+      grid.innerHTML = CATEGORIES.map(cat => `
+        <button type="button" class="cat-option" data-cat-id="${cat.id}">
+          <span>${cat.icon}</span>
+          <span>${cat.name}</span>
+        </button>
+      `).join("");
+
+      grid.querySelectorAll(".cat-option").forEach(btn => {
+        btn.addEventListener("click", () => {
+          selectFormCategory(btn.dataset.catId);
+        });
+      });
+    }
+
+    function selectFormCategory(catId) {
+      formCategoryId = catId;
+      document.querySelectorAll("#categorySelectorGrid .cat-option").forEach(btn => {
+        btn.classList.toggle("selected", btn.dataset.catId === catId);
+      });
+    }
+
+    function setFormType(type) {
+      formType = type;
+      const btnExp = document.getElementById("btnTypeExpense");
+      const btnInc = document.getElementById("btnTypeIncome");
+      const catGroup = document.getElementById("categorySectionGroup");
+      const fixedGroup = document.getElementById("fixedCheckboxGroup");
+      const fixedTitle = document.getElementById("fixedCheckboxTitle");
+      const fixedSub = document.getElementById("fixedCheckboxSub");
+      const editMode = document.getElementById("editModeInput").value;
+      const editId = document.getElementById("editIdInput").value;
+
+      if (type === "expense") {
+        btnExp.className = "type-btn active-expense";
+        btnInc.className = "type-btn";
+        catGroup.style.display = "block";
+        fixedTitle.textContent = "Gasto fijo mensual";
+        fixedSub.textContent = "Se repetirá automáticamente cada mes en este día";
+        fixedGroup.style.display = (editMode === "transaction" && !editId) ? "block" : "none";
+      } else {
+        btnExp.className = "type-btn";
+        btnInc.className = "type-btn active-income";
+        catGroup.style.display = "none";
+        fixedTitle.textContent = "Ingreso fijo mensual";
+        fixedSub.textContent = "Se añadirá automáticamente cada mes en este día";
+        fixedGroup.style.display = (editMode === "transaction" && !editId) ? "block" : "none";
+      }
+    }
+
+    function openNewMovementModal() {
+      document.getElementById("editIdInput").value = "";
+      document.getElementById("editModeInput").value = "transaction";
+      document.getElementById("modalTitle").textContent = "Nuevo Movimiento";
+      document.getElementById("saveMovementBtn").textContent = "Guardar Movimiento";
+
+      document.getElementById("typeSelectorContainer").style.display = "grid";
+      document.getElementById("dateFieldGroup").style.display = "block";
+      document.getElementById("dayOfMonthFieldGroup").style.display = "none";
+
+      document.getElementById("amountInput").value = "";
+      document.getElementById("descInput").value = "";
+      document.getElementById("isFixedCheckbox").checked = false;
+
+      // Por defecto hoy si estamos en el mes actual, o día 1 del mes seleccionado
+      const isCurrentMonth = (currentYear === today.getFullYear() && currentMonth === today.getMonth());
+      document.getElementById("dateInput").value = isCurrentMonth
+        ? getTodayISO()
+        : buildDateString(currentYear, currentMonth, 1);
+
+      selectFormCategory(CATEGORIES[0].id);
+      setFormType("expense");
+
+      document.getElementById("movementModal").classList.add("open");
+      setTimeout(() => document.getElementById("amountInput").focus(), 120);
+    }
+
+    function openEditTransaction(txId) {
+      const tx = appState.transactions.find(t => t.id === txId);
+      if (!tx) return;
+
+      document.getElementById("editIdInput").value = tx.id;
+      document.getElementById("editModeInput").value = "transaction";
+      document.getElementById("modalTitle").textContent = "Editar Movimiento";
+      document.getElementById("saveMovementBtn").textContent = "Actualizar Movimiento";
+
+      document.getElementById("typeSelectorContainer").style.display = "grid";
+      document.getElementById("dateFieldGroup").style.display = "block";
+      document.getElementById("dayOfMonthFieldGroup").style.display = "none";
+
+      document.getElementById("amountInput").value = tx.amount;
+      document.getElementById("dateInput").value = tx.date;
+      document.getElementById("descInput").value = tx.description || "";
+      document.getElementById("isFixedCheckbox").checked = false;
+
+      if (tx.categoryId) selectFormCategory(tx.categoryId);
+      setFormType(tx.type);
+
+      document.getElementById("movementModal").classList.add("open");
+    }
+
+    function openNewFixedTemplateModal() {
+      document.getElementById("editIdInput").value = "";
+      document.getElementById("editModeInput").value = "fixedTemplate";
+      document.getElementById("modalTitle").textContent = "Nuevo Movimiento Fijo Mensual";
+      document.getElementById("saveMovementBtn").textContent = "Guardar Movimiento Fijo";
+
+      document.getElementById("typeSelectorContainer").style.display = "grid";
+      document.getElementById("dateFieldGroup").style.display = "none";
+      document.getElementById("dayOfMonthFieldGroup").style.display = "block";
+      document.getElementById("fixedCheckboxGroup").style.display = "none";
+
+      document.getElementById("amountInput").value = "";
+      document.getElementById("dayOfMonthInput").value = today.getDate();
+      document.getElementById("descInput").value = "";
+      selectFormCategory(CATEGORIES[0].id);
+      setFormType("expense");
+
+      document.getElementById("movementModal").classList.add("open");
+      setTimeout(() => document.getElementById("amountInput").focus(), 120);
+    }
+
+    function openEditFixedTemplate(tplId) {
+      const tpl = appState.fixedTemplates.find(t => t.id === tplId);
+      if (!tpl) return;
+
+      const tplType = tpl.type === "income" ? "income" : "expense";
+
+      document.getElementById("editIdInput").value = tpl.id;
+      document.getElementById("editModeInput").value = "fixedTemplate";
+      document.getElementById("modalTitle").textContent = tplType === "income"
+        ? "Editar Ingreso Fijo Mensual"
+        : "Editar Gasto Fijo Mensual";
+      document.getElementById("saveMovementBtn").textContent = "Actualizar Movimiento Fijo";
+
+      document.getElementById("typeSelectorContainer").style.display = "grid";
+      document.getElementById("dateFieldGroup").style.display = "none";
+      document.getElementById("dayOfMonthFieldGroup").style.display = "block";
+      document.getElementById("fixedCheckboxGroup").style.display = "none";
+
+      document.getElementById("amountInput").value = tpl.amount;
+      document.getElementById("dayOfMonthInput").value = tpl.dayOfMonth;
+      document.getElementById("descInput").value = tpl.description || "";
+      if (tpl.categoryId) selectFormCategory(tpl.categoryId);
+      setFormType(tplType);
+
+      document.getElementById("movementModal").classList.add("open");
+    }
+
+    function closeMovementModal() {
+      document.getElementById("movementModal").classList.remove("open");
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const rawAmount = parseFloat(String(document.getElementById("amountInput").value).replace(",", "."));
+      if (isNaN(rawAmount) || rawAmount <= 0) {
+        showToast("Introduce un importe válido mayor que 0 €");
+        document.getElementById("amountInput").focus();
+        return;
+      }
+
+      const amount = Math.round(rawAmount * 100) / 100;
+      const editId = document.getElementById("editIdInput").value;
+      const editMode = document.getElementById("editModeInput").value;
+      const descInputVal = document.getElementById("descInput").value.trim();
+
+      // CASO A: Guardar o editar una plantilla de Movimiento Fijo Mensual (Ingreso o Gasto)
+      if (editMode === "fixedTemplate") {
+        let dayOfMonth = parseInt(document.getElementById("dayOfMonthInput").value, 10);
+        if (isNaN(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) dayOfMonth = 1;
+        const isExpense = formType === "expense";
+        const cat = isExpense ? getCategoryById(formCategoryId) : null;
+        const description = descInputVal || (isExpense ? cat.name : "Ingreso fijo");
+
+        if (editId) {
+          const idx = appState.fixedTemplates.findIndex(t => t.id === editId);
+          if (idx !== -1) {
+            appState.fixedTemplates[idx] = {
+              ...appState.fixedTemplates[idx],
+              type: formType,
+              amount,
+              dayOfMonth,
+              description,
+              categoryId: isExpense ? formCategoryId : null
+            };
+          }
+          showToast(isExpense ? "Gasto fijo actualizado" : "Ingreso fijo actualizado");
+        } else {
+          const newTpl = {
+            id: generateId(),
+            type: formType,
+            amount,
+            dayOfMonth,
+            description,
+            categoryId: isExpense ? formCategoryId : null,
+            active: true
+          };
+          appState.fixedTemplates.push(newTpl);
+
+          // Insertarlo también en el mes actual que está viendo el usuario si no existe
+          const txDate = buildDateString(currentYear, currentMonth, dayOfMonth);
+          appState.transactions.push({
+            id: generateId(),
+            type: formType,
+            amount,
+            date: txDate,
+            description,
+            categoryId: isExpense ? formCategoryId : null,
+            fixedTemplateId: newTpl.id
+          });
+          showToast(isExpense
+            ? "Gasto fijo creado y aplicado este mes"
+            : "Ingreso fijo creado y aplicado este mes");
+        }
+
+        saveState();
+        closeMovementModal();
+        renderAll();
+        return;
+      }
+
+      // CASO B: Guardar o editar un movimiento diario (Ingreso o Gasto)
+      const dateStr = document.getElementById("dateInput").value || getTodayISO();
+      const isExpense = formType === "expense";
+      const cat = isExpense ? getCategoryById(formCategoryId) : null;
+      const description = descInputVal || (isExpense ? cat.name : "Ingreso");
+
+      if (editId) {
+        const idx = appState.transactions.findIndex(t => t.id === editId);
+        if (idx !== -1) {
+          appState.transactions[idx] = {
+            ...appState.transactions[idx],
+            type: formType,
+            amount,
+            date: dateStr,
+            description,
+            categoryId: isExpense ? formCategoryId : null
+          };
+        }
+        showToast("Movimiento actualizado");
+      } else {
+        const isFixedChecked = document.getElementById("isFixedCheckbox").checked;
+        let fixedTemplateId = null;
+
+        if (isFixedChecked) {
+          const dayNum = parseInt(dateStr.split("-")[2], 10) || 1;
+          const newTpl = {
+            id: generateId(),
+            type: formType,
+            amount,
+            dayOfMonth: dayNum,
+            description,
+            categoryId: isExpense ? formCategoryId : null,
+            active: true
+          };
+          appState.fixedTemplates.push(newTpl);
+          fixedTemplateId = newTpl.id;
+        }
+
+        appState.transactions.push({
+          id: generateId(),
+          type: formType,
+          amount,
+          date: dateStr,
+          description,
+          categoryId: isExpense ? formCategoryId : null,
+          fixedTemplateId
+        });
+
+        // Mover la vista al mes de la fecha introducida si el usuario puso otro mes
+        const [y, m] = dateStr.split("-").map(Number);
+        if (y && m) {
+          currentYear = y;
+          currentMonth = m - 1;
+        }
+
+        if (isFixedChecked) {
+          showToast(isExpense
+            ? "Gasto guardado y configurado como fijo mensual"
+            : "Ingreso guardado y configurado como fijo mensual");
+        } else {
+          showToast("Movimiento guardado");
+        }
+      }
+
+      saveState();
+      closeMovementModal();
+      renderAll();
+    }
+
+    /* ==========================================================================
+       6. ACCIONES SOBRE MOVIMIENTOS Y GASTOS FIJOS (CON DIÁLOGO SEGURO)
+       ========================================================================== */
+    let pendingConfirmAction = null;
+
+    function openConfirmDialog(title, message, onConfirm) {
+      document.getElementById("confirmTitle").textContent = title;
+      document.getElementById("confirmMessage").textContent = message;
+      pendingConfirmAction = onConfirm;
+      document.getElementById("confirmModal").classList.add("open");
+    }
+
+    function closeConfirmDialog() {
+      document.getElementById("confirmModal").classList.remove("open");
+      pendingConfirmAction = null;
+    }
+
+    function requestDeleteTransaction(txId) {
+      openConfirmDialog(
+        "Eliminar movimiento",
+        "¿Seguro que quieres borrar este movimiento de este mes?",
+        () => {
+          appState.transactions = appState.transactions.filter(t => t.id !== txId);
+          saveState();
+          renderAll();
+          showToast("Movimiento eliminado");
+        }
+      );
+    }
+
+    function toggleFixedTemplate(tplId) {
+      const tpl = appState.fixedTemplates.find(t => t.id === tplId);
+      if (!tpl) return;
+      tpl.active = !tpl.active;
+      saveState();
+      renderFixedTemplates();
+      const label = tpl.type === "income" ? "Ingreso fijo" : "Gasto fijo";
+      showToast(tpl.active ? `${label} activado para meses futuros` : `${label} pausado`);
+    }
+
+    function requestDeleteFixedTemplate(tplId) {
+      const tpl = appState.fixedTemplates.find(t => t.id === tplId);
+      const isIncome = tpl && tpl.type === "income";
+      openConfirmDialog(
+        isIncome ? "Eliminar ingreso fijo" : "Eliminar gasto fijo",
+        "Dejará de generarse automáticamente en meses futuros. Los movimientos ya registrados en meses pasados o actuales se conservarán.",
+        () => {
+          appState.fixedTemplates = appState.fixedTemplates.filter(t => t.id !== tplId);
+          saveState();
+          renderAll();
+          showToast(isIncome ? "Plantilla de ingreso fijo eliminada" : "Plantilla de gasto fijo eliminada");
+        }
+      );
+    }
+
+    /* ==========================================================================
+       7. EXPORTAR / IMPORTAR COPIA DE SEGURIDAD JSON Y TEMA OSCURO
+       ========================================================================== */
+    function exportBackupJSON() {
+      const payload = {
+        app: "MiBalanceOffline",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        data: appState
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mi-balance-backup-${getTodayISO()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Copia de seguridad descargada");
+    }
+
+    function handleImportJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          const importedData = parsed.data ? parsed.data : parsed;
+
+          if (!Array.isArray(importedData.transactions) || !Array.isArray(importedData.fixedTemplates)) {
+            throw new Error("Formato inválido");
+          }
+
+          openConfirmDialog(
+            "Restaurar copia de seguridad",
+            `Se cargarán ${importedData.transactions.length} movimientos y ${importedData.fixedTemplates.length} plantillas fijas, reemplazando los datos actuales. ¿Continuar?`,
+            () => {
+              appState.transactions = importedData.transactions;
+              appState.fixedTemplates = importedData.fixedTemplates.map(tpl => ({
+                ...tpl,
+                type: tpl.type === "income" ? "income" : "expense"
+              }));
+              appState.generatedMonths = Array.isArray(importedData.generatedMonths) ? importedData.generatedMonths : [];
+              saveState();
+              renderAll();
+              showToast("Copia restaurada correctamente");
+            }
+          );
+        } catch (err) {
+          showToast("El archivo JSON no es válido");
+        } finally {
+          event.target.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function applyTheme(theme) {
+      appState.theme = theme;
+      document.documentElement.setAttribute("data-theme", theme);
+      const icon = document.getElementById("themeIcon");
+      if (theme === "dark") {
+        icon.innerHTML = `<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>`;
+      } else {
+        icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
+      }
+    }
+
+    /* ==========================================================================
+       8. REGISTRO DE SERVICE WORKER OFFLINE INLINE (SI EL NAVEGADOR LO PERMITE)
+       ========================================================================== */
+    function registerInlineServiceWorker() {
+      if ("serviceWorker" in navigator && (location.protocol === "https:" || location.protocol === "http:")) {
+        const swCode = `
+          const CACHE_NAME = 'mi-balance-cache-v1';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+            e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(self.clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            e.respondWith(
+              caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('./')))
+            );
+          });
+        `;
+        try {
+          const blob = new Blob([swCode], { type: "application/javascript" });
+          const swUrl = URL.createObjectURL(blob);
+          navigator.serviceWorker.register(swUrl).catch(() => {});
+        } catch (e) {}
+      }
+    }
+
+    /* ==========================================================================
+       9. EVENTOS E INICIALIZACIÓN DE LA APLICACIÓN
+       ========================================================================== */
+    window.addEventListener("DOMContentLoaded", () => {
+      loadState();
+      initCategorySelectors();
+      registerInlineServiceWorker();
+
+      // Navegación entre meses
+      document.getElementById("prevMonthBtn").addEventListener("click", () => {
+        currentMonth--;
+        if (currentMonth < 0) {
+          currentMonth = 11;
+          currentYear--;
+        }
+        renderAll();
+      });
+
+      document.getElementById("nextMonthBtn").addEventListener("click", () => {
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+        renderAll();
+      });
+
+      document.getElementById("currentMonthDisplay").addEventListener("click", () => {
+        const now = new Date();
+        currentYear = now.getFullYear();
+        currentMonth = now.getMonth();
+        renderAll();
+        showToast("Mes actual seleccionado");
+      });
+
+      // Navegación inferior entre vistas
+      document.querySelectorAll(".bottom-nav .nav-item").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".bottom-nav .nav-item").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          const targetId = btn.dataset.target;
+          document.querySelectorAll(".view-section").forEach(sec => {
+            sec.classList.toggle("active", sec.id === targetId);
+          });
+        });
+      });
+
+      // Botones del modal
+      document.getElementById("openAddModalBtn").addEventListener("click", openNewMovementModal);
+      document.getElementById("addFixedDirectBtn").addEventListener("click", openNewFixedTemplateModal);
+      document.getElementById("closeModalBtn").addEventListener("click", closeMovementModal);
+      document.getElementById("movementModal").addEventListener("click", (e) => {
+        if (e.target.id === "movementModal") closeMovementModal();
+      });
+
+      document.getElementById("btnTypeExpense").addEventListener("click", () => setFormType("expense"));
+      document.getElementById("btnTypeIncome").addEventListener("click", () => setFormType("income"));
+      document.getElementById("movementForm").addEventListener("submit", handleFormSubmit);
+
+      // Filtros de movimientos
+      document.querySelectorAll("#typeFilterChips .chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          document.querySelectorAll("#typeFilterChips .chip").forEach(c => c.classList.remove("active"));
+          chip.classList.add("active");
+          activeTypeFilter = chip.dataset.filter;
+          renderDashboard();
+        });
+      });
+
+      document.getElementById("categoryFilterSelect").addEventListener("change", (e) => {
+        activeCategoryFilter = e.target.value;
+        renderDashboard();
+      });
+
+      // Mostrar / Ocultar desglose de categorías
+      document.getElementById("toggleBreakdownBtn").addEventListener("click", (e) => {
+        showBreakdown = !showBreakdown;
+        e.target.textContent = showBreakdown ? "Ocultar" : "Mostrar";
+        renderDashboard();
+      });
+
+      // Tema claro / oscuro
+      document.getElementById("themeToggleBtn").addEventListener("click", () => {
+        const nextTheme = appState.theme === "dark" ? "light" : "dark";
+        applyTheme(nextTheme);
+        saveState();
+      });
+
+      // Copia de seguridad JSON y borrado total
+      document.getElementById("exportJsonBtn").addEventListener("click", exportBackupJSON);
+      document.getElementById("importJsonTriggerBtn").addEventListener("click", () => {
+        document.getElementById("importJsonFileInput").click();
+      });
+      document.getElementById("importJsonFileInput").addEventListener("change", handleImportJSON);
+
+      document.getElementById("resetAllDataBtn").addEventListener("click", () => {
+        openConfirmDialog(
+          "Borrar todos los datos",
+          "Se eliminarán permanentemente todos tus ingresos, gastos y plantillas fijas de este navegador. ¿Estás seguro?",
+          () => {
+            appState.transactions = [];
+            appState.fixedTemplates = [];
+            appState.generatedMonths = [];
+            saveState();
+            renderAll();
+            showToast("Todos los datos han sido borrados");
+          }
+        );
+      });
+
+      // Eventos del diálogo de confirmación
+      document.getElementById("confirmCancelBtn").addEventListener("click", closeConfirmDialog);
+      document.getElementById("confirmOkBtn").addEventListener("click", () => {
+        if (typeof pendingConfirmAction === "function") {
+          pendingConfirmAction();
+        }
+        closeConfirmDialog();
+      });
+
+      // Render inicial
+      renderAll();
+    });
+  </script>
+</body>
+</html>
